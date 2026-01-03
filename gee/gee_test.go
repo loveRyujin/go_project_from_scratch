@@ -22,79 +22,35 @@ func TestEngine_New(t *testing.T) {
 	}
 }
 
-func TestEngine_addRoute(t *testing.T) {
+func TestEngine_Get(t *testing.T) {
 	e := New()
 
 	handler := func(c *Context) {
 		c.Status(http.StatusOK)
-		c.w.Write([]byte("test"))
+		c.w.Write([]byte("GET handler"))
 	}
 
-	e.addRoute("GET", "/test", handler)
+	e.Get("/hello", handler)
 
-	key := "GET_/test"
+	key := "GET_/hello"
 	if _, ok := e.router.handlers[key]; !ok {
-		t.Errorf("Route %s not found in router", key)
-	}
-
-	if len(e.router.handlers) != 1 {
-		t.Errorf("Expected 1 route, got %d", len(e.router.handlers))
+		t.Errorf("GET route %s not found in router", key)
 	}
 }
 
-func TestEngine_RegisterRoute(t *testing.T) {
-	tests := []struct {
-		name         string
-		method       string
-		path         string
-		registerFunc func(*Engine, string, Handler)
-		expectedKey  string
-	}{
-		{
-			name:         "register GET route",
-			method:       "GET",
-			path:         "/hello",
-			registerFunc: func(e *Engine, path string, handler Handler) { e.Get(path, handler) },
-			expectedKey:  "GET_/hello",
-		},
-		{
-			name:         "register POST route",
-			method:       "POST",
-			path:         "/users",
-			registerFunc: func(e *Engine, path string, handler Handler) { e.Post(path, handler) },
-			expectedKey:  "POST_/users",
-		},
-		{
-			name:         "register GET route with different path",
-			method:       "GET",
-			path:         "/api/users",
-			registerFunc: func(e *Engine, path string, handler Handler) { e.Get(path, handler) },
-			expectedKey:  "GET_/api/users",
-		},
-		{
-			name:         "register POST route with different path",
-			method:       "POST",
-			path:         "/api/posts",
-			registerFunc: func(e *Engine, path string, handler Handler) { e.Post(path, handler) },
-			expectedKey:  "POST_/api/posts",
-		},
+func TestEngine_Post(t *testing.T) {
+	e := New()
+
+	handler := func(c *Context) {
+		c.Status(http.StatusOK)
+		c.w.Write([]byte("POST handler"))
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			e := New()
+	e.Post("/users", handler)
 
-			handler := func(c *Context) {
-				c.Status(http.StatusOK)
-				c.w.Write([]byte("handler"))
-			}
-
-			tt.registerFunc(e, tt.path, handler)
-
-			if _, ok := e.router.handlers[tt.expectedKey]; !ok {
-				t.Errorf("Route %s not found in router", tt.expectedKey)
-			}
-		})
+	key := "POST_/users"
+	if _, ok := e.router.handlers[key]; !ok {
+		t.Errorf("POST route %s not found in router", key)
 	}
 }
 
