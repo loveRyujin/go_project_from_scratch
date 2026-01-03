@@ -2,6 +2,7 @@ package gee
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
@@ -48,4 +49,15 @@ func (c *Context) JSON(code int, obj any) {
 	if err := encoder.Encode(obj); err != nil {
 		http.Error(c.w, err.Error(), code)
 	}
+}
+
+func (c *Context) String(code int, format string, args ...any) {
+	c.SetHeader("Content-Type", "text/plain")
+	c.Status(code)
+	c.w.Write([]byte(fmt.Sprintf(format, args...)))
+}
+
+func (c *Context) Data(code int, data []byte) {
+	c.Status(code)
+	c.w.Write(data)
 }
