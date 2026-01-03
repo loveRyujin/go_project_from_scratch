@@ -11,7 +11,7 @@ type Engine struct {
 	router map[string]Handler
 }
 
-func (e *Engine) New() *Engine {
+func New() *Engine {
 	return &Engine{
 		router: make(map[string]Handler),
 	}

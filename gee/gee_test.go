@@ -7,8 +7,7 @@ import (
 )
 
 func TestEngine_New(t *testing.T) {
-	e := &Engine{}
-	newEngine := e.New()
+	newEngine := New()
 
 	if newEngine == nil {
 		t.Fatal("New() returned nil")
