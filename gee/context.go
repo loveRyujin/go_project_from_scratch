@@ -31,6 +31,14 @@ func (c *Context) Param(key string) string {
 	return c.params[key]
 }
 
+func (c *Context) Method() string {
+	return c.method
+}
+
+func (c *Context) Path() string {
+	return c.path
+}
+
 func (c *Context) PostForm(key string) string {
 	return c.r.FormValue(key)
 }
