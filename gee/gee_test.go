@@ -96,7 +96,7 @@ func TestEngine_ServeHTTP(t *testing.T) {
 			},
 			requestMethod:  "GET",
 			requestPath:    "/notfound",
-			expectedStatus: http.StatusOK, // 当前实现返回 200
+			expectedStatus: http.StatusNotFound,
 			expectedBody:   "404 NOT FOUND: /notfound\n",
 		},
 		{
@@ -109,7 +109,7 @@ func TestEngine_ServeHTTP(t *testing.T) {
 			},
 			requestMethod:  "GET",
 			requestPath:    "/users",
-			expectedStatus: http.StatusOK,
+			expectedStatus: http.StatusNotFound,
 			expectedBody:   "404 NOT FOUND: /users\n",
 		},
 		{
@@ -122,7 +122,7 @@ func TestEngine_ServeHTTP(t *testing.T) {
 			},
 			requestMethod:  "POST",
 			requestPath:    "/hello",
-			expectedStatus: http.StatusOK,
+			expectedStatus: http.StatusNotFound,
 			expectedBody:   "404 NOT FOUND: /hello\n",
 		},
 		{

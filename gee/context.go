@@ -14,6 +14,7 @@ type Context struct {
 	method     string
 	path       string
 	statusCode int
+	params     map[string]string
 }
 
 func newContext(w http.ResponseWriter, r *http.Request) *Context {
@@ -22,7 +23,12 @@ func newContext(w http.ResponseWriter, r *http.Request) *Context {
 		r:      r,
 		method: r.Method,
 		path:   r.URL.Path,
+		params: make(map[string]string),
 	}
+}
+
+func (c *Context) Param(key string) string {
+	return c.params[key]
 }
 
 func (c *Context) PostForm(key string) string {

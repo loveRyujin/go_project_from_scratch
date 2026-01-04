@@ -1,6 +1,7 @@
 package gee
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -35,6 +36,14 @@ func TestNewContext(t *testing.T) {
 
 	if c.statusCode != 0 {
 		t.Errorf("Expected initial status code 0, got %d", c.statusCode)
+	}
+
+	if c.params == nil {
+		t.Error("Expected params map to be initialized")
+	}
+
+	if len(c.params) != 0 {
+		t.Errorf("Expected empty params map, got %d params", len(c.params))
 	}
 }
 
@@ -320,5 +329,213 @@ func TestContext_JSON_ErrorHandling(t *testing.T) {
 	// 响应体应该包含错误信息
 	if rr.Body.Len() == 0 {
 		t.Error("Expected error message in response body")
+	}
+}
+
+func TestContext_Param(t *testing.T) {
+	tests := []struct {
+		name          string
+		params        map[string]string
+		key           string
+		expectedValue string
+	}{
+		{
+			name:          "get existing param",
+			params:        map[string]string{"id": "123", "name": "john"},
+			key:           "id",
+			expectedValue: "123",
+		},
+		{
+			name:          "get another param",
+			params:        map[string]string{"id": "123", "name": "john"},
+			key:           "name",
+			expectedValue: "john",
+		},
+		{
+			name:          "get non-existent param",
+			params:        map[string]string{"id": "123"},
+			key:           "email",
+			expectedValue: "",
+		},
+		{
+			name:          "empty params map",
+			params:        map[string]string{},
+			key:           "id",
+			expectedValue: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/test", nil)
+			rr := httptest.NewRecorder()
+
+			c := newContext(rr, req)
+			c.params = tt.params
+
+			value := c.Param(tt.key)
+
+			if value != tt.expectedValue {
+				t.Errorf("Expected value %q, got %q", tt.expectedValue, value)
+			}
+		})
+	}
+}
+
+func TestContext_String(t *testing.T) {
+	tests := []struct {
+		name           string
+		code           int
+		format         string
+		args           []any
+		expectedStatus int
+		expectedBody   string
+		checkHeader    bool
+	}{
+		{
+			name:           "simple string",
+			code:           http.StatusOK,
+			format:         "Hello, World!",
+			args:           nil,
+			expectedStatus: http.StatusOK,
+			expectedBody:   "Hello, World!",
+			checkHeader:    true,
+		},
+		{
+			name:           "formatted string",
+			code:           http.StatusOK,
+			format:         "User ID: %d",
+			args:           []any{123},
+			expectedStatus: http.StatusOK,
+			expectedBody:   "User ID: 123",
+			checkHeader:    true,
+		},
+		{
+			name:           "multiple args",
+			code:           http.StatusOK,
+			format:         "User: %s, Age: %d",
+			args:           []any{"john", 30},
+			expectedStatus: http.StatusOK,
+			expectedBody:   "User: john, Age: 30",
+			checkHeader:    true,
+		},
+		{
+			name:           "not found status",
+			code:           http.StatusNotFound,
+			format:         "404 NOT FOUND: %s",
+			args:           []any{"/test"},
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   "404 NOT FOUND: /test",
+			checkHeader:    true,
+		},
+		{
+			name:           "empty string",
+			code:           http.StatusOK,
+			format:         "",
+			args:           nil,
+			expectedStatus: http.StatusOK,
+			expectedBody:   "",
+			checkHeader:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/test", nil)
+			rr := httptest.NewRecorder()
+
+			c := newContext(rr, req)
+
+			// 构建预期的格式化字符串
+			var formatted string
+			if tt.args == nil {
+				formatted = tt.format
+			} else {
+				formatted = fmt.Sprintf(tt.format, tt.args...)
+			}
+
+			// 使用常量格式字符串调用 String 方法
+			c.String(tt.code, "%s", formatted)
+
+			if rr.Code != tt.expectedStatus {
+				t.Errorf("Expected status code %d, got %d", tt.expectedStatus, rr.Code)
+			}
+
+			if rr.Body.String() != tt.expectedBody {
+				t.Errorf("Expected body %q, got %q", tt.expectedBody, rr.Body.String())
+			}
+
+			if tt.checkHeader {
+				contentType := rr.Header().Get("Content-Type")
+				if contentType != "text/plain" {
+					t.Errorf("Expected Content-Type text/plain, got %s", contentType)
+				}
+			}
+		})
+	}
+}
+
+func TestContext_Data(t *testing.T) {
+	tests := []struct {
+		name           string
+		code           int
+		data           []byte
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "simple byte array",
+			code:           http.StatusOK,
+			data:           []byte("Hello, World!"),
+			expectedStatus: http.StatusOK,
+			expectedBody:   "Hello, World!",
+		},
+		{
+			name:           "empty byte array",
+			code:           http.StatusOK,
+			data:           []byte{},
+			expectedStatus: http.StatusOK,
+			expectedBody:   "",
+		},
+		{
+			name:           "binary data",
+			code:           http.StatusOK,
+			data:           []byte{0x00, 0x01, 0x02, 0x03},
+			expectedStatus: http.StatusOK,
+			expectedBody:   string([]byte{0x00, 0x01, 0x02, 0x03}),
+		},
+		{
+			name:           "not found status",
+			code:           http.StatusNotFound,
+			data:           []byte("Not Found"),
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   "Not Found",
+		},
+		{
+			name:           "JSON data",
+			code:           http.StatusOK,
+			data:           []byte(`{"name":"john","age":30}`),
+			expectedStatus: http.StatusOK,
+			expectedBody:   `{"name":"john","age":30}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/test", nil)
+			rr := httptest.NewRecorder()
+
+			c := newContext(rr, req)
+
+			c.Data(tt.code, tt.data)
+
+			if rr.Code != tt.expectedStatus {
+				t.Errorf("Expected status code %d, got %d", tt.expectedStatus, rr.Code)
+			}
+
+			if rr.Body.String() != tt.expectedBody {
+				t.Errorf("Expected body %q, got %q", tt.expectedBody, rr.Body.String())
+			}
+		})
 	}
 }
