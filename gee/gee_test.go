@@ -30,7 +30,7 @@ func TestEngine_Get(t *testing.T) {
 		c.w.Write([]byte("GET handler"))
 	}
 
-	e.Get("/hello", handler)
+	e.GET("/hello", handler)
 
 	key := "GET_/hello"
 	if _, ok := e.router.handlers[key]; !ok {
@@ -46,7 +46,7 @@ func TestEngine_Post(t *testing.T) {
 		c.w.Write([]byte("POST handler"))
 	}
 
-	e.Post("/users", handler)
+	e.POST("/users", handler)
 
 	key := "POST_/users"
 	if _, ok := e.router.handlers[key]; !ok {
@@ -66,7 +66,7 @@ func TestEngine_ServeHTTP(t *testing.T) {
 		{
 			name: "successful GET request",
 			setupRoutes: func(e *Engine) {
-				e.Get("/hello", func(c *Context) {
+				e.GET("/hello", func(c *Context) {
 					c.Status(http.StatusOK)
 					c.w.Write([]byte("Hello, World!"))
 				})
@@ -79,7 +79,7 @@ func TestEngine_ServeHTTP(t *testing.T) {
 		{
 			name: "successful POST request",
 			setupRoutes: func(e *Engine) {
-				e.Post("/users", func(c *Context) {
+				e.POST("/users", func(c *Context) {
 					c.Status(http.StatusOK)
 					c.w.Write([]byte("POST handler"))
 				})
@@ -102,7 +102,7 @@ func TestEngine_ServeHTTP(t *testing.T) {
 		{
 			name: "method mismatch - GET on POST route",
 			setupRoutes: func(e *Engine) {
-				e.Post("/users", func(c *Context) {
+				e.POST("/users", func(c *Context) {
 					c.Status(http.StatusOK)
 					c.w.Write([]byte("POST handler"))
 				})
@@ -115,7 +115,7 @@ func TestEngine_ServeHTTP(t *testing.T) {
 		{
 			name: "method mismatch - POST on GET route",
 			setupRoutes: func(e *Engine) {
-				e.Get("/hello", func(c *Context) {
+				e.GET("/hello", func(c *Context) {
 					c.Status(http.StatusOK)
 					c.w.Write([]byte("GET handler"))
 				})
@@ -128,11 +128,11 @@ func TestEngine_ServeHTTP(t *testing.T) {
 		{
 			name: "multiple routes same path different methods - GET",
 			setupRoutes: func(e *Engine) {
-				e.Get("/api/users", func(c *Context) {
+				e.GET("/api/users", func(c *Context) {
 					c.Status(http.StatusOK)
 					c.w.Write([]byte("GET response"))
 				})
-				e.Post("/api/users", func(c *Context) {
+				e.POST("/api/users", func(c *Context) {
 					c.Status(http.StatusOK)
 					c.w.Write([]byte("POST response"))
 				})
@@ -145,11 +145,11 @@ func TestEngine_ServeHTTP(t *testing.T) {
 		{
 			name: "multiple routes same path different methods - POST",
 			setupRoutes: func(e *Engine) {
-				e.Get("/api/users", func(c *Context) {
+				e.GET("/api/users", func(c *Context) {
 					c.Status(http.StatusOK)
 					c.w.Write([]byte("GET response"))
 				})
-				e.Post("/api/users", func(c *Context) {
+				e.POST("/api/users", func(c *Context) {
 					c.Status(http.StatusOK)
 					c.w.Write([]byte("POST response"))
 				})
@@ -162,7 +162,7 @@ func TestEngine_ServeHTTP(t *testing.T) {
 		{
 			name: "empty path",
 			setupRoutes: func(e *Engine) {
-				e.Get("/", func(c *Context) {
+				e.GET("/", func(c *Context) {
 					c.Status(http.StatusOK)
 					c.w.Write([]byte("root"))
 				})
