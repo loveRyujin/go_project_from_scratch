@@ -475,6 +475,95 @@ func TestContext_String(t *testing.T) {
 	}
 }
 
+func TestContext_Method(t *testing.T) {
+	tests := []struct {
+		name           string
+		requestMethod  string
+		expectedMethod string
+	}{
+		{
+			name:           "GET method",
+			requestMethod:  "GET",
+			expectedMethod: "GET",
+		},
+		{
+			name:           "POST method",
+			requestMethod:  "POST",
+			expectedMethod: "POST",
+		},
+		{
+			name:           "PUT method",
+			requestMethod:  "PUT",
+			expectedMethod: "PUT",
+		},
+		{
+			name:           "DELETE method",
+			requestMethod:  "DELETE",
+			expectedMethod: "DELETE",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.requestMethod, "/test", nil)
+			rr := httptest.NewRecorder()
+
+			c := newContext(rr, req)
+
+			if c.Method() != tt.expectedMethod {
+				t.Errorf("Expected method %s, got %s", tt.expectedMethod, c.Method())
+			}
+		})
+	}
+}
+
+func TestContext_Path(t *testing.T) {
+	tests := []struct {
+		name         string
+		requestPath  string
+		expectedPath string
+	}{
+		{
+			name:         "simple path",
+			requestPath:  "/hello",
+			expectedPath: "/hello",
+		},
+		{
+			name:         "nested path",
+			requestPath:  "/api/users",
+			expectedPath: "/api/users",
+		},
+		{
+			name:         "path with query",
+			requestPath:  "/users?page=1",
+			expectedPath: "/users",
+		},
+		{
+			name:         "root path",
+			requestPath:  "/",
+			expectedPath: "/",
+		},
+		{
+			name:         "path with params",
+			requestPath:  "/users/123/posts/456",
+			expectedPath: "/users/123/posts/456",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.requestPath, nil)
+			rr := httptest.NewRecorder()
+
+			c := newContext(rr, req)
+
+			if c.Path() != tt.expectedPath {
+				t.Errorf("Expected path %s, got %s", tt.expectedPath, c.Path())
+			}
+		})
+	}
+}
+
 func TestContext_Data(t *testing.T) {
 	tests := []struct {
 		name           string
