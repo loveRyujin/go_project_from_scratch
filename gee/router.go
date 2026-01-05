@@ -2,6 +2,7 @@ package gee
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -44,6 +45,7 @@ func (r *router) addRoute(method, pattern string, handler Handler) {
 	}
 	r.roots[method].insert(pattern, parts, 0)
 	r.handlers[key] = handler
+	log.Printf("Route %4s - %s", method, pattern)
 }
 
 func (r *router) getRoute(method string, path string) (*node, map[string]string) {
@@ -77,8 +79,13 @@ func (r *router) handle(c *Context) {
 	if n != nil {
 		c.params = params
 		key := fmt.Sprintf("%s_%s", c.method, n.pattern)
-		r.handlers[key](c)
+		c.handlers = append(c.handlers, func(c *Context) {
+			r.handlers[key](c)
+		})
 	} else {
-		c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.path)
+		c.handlers = append(c.handlers, func(c *Context) {
+			c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.path)
+		})
 	}
+	c.Next()
 }

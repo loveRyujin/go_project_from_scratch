@@ -15,15 +15,19 @@ type Context struct {
 	path       string
 	statusCode int
 	params     map[string]string
+	handlers   HandlerChain
+	index      int
 }
 
 func newContext(w http.ResponseWriter, r *http.Request) *Context {
 	return &Context{
-		w:      w,
-		r:      r,
-		method: r.Method,
-		path:   r.URL.Path,
-		params: make(map[string]string),
+		w:        w,
+		r:        r,
+		method:   r.Method,
+		path:     r.URL.Path,
+		params:   make(map[string]string),
+		handlers: nil,
+		index:    -1,
 	}
 }
 
@@ -74,4 +78,12 @@ func (c *Context) String(code int, format string, args ...any) {
 func (c *Context) Data(code int, data []byte) {
 	c.Status(code)
 	c.w.Write(data)
+}
+
+func (c *Context) Next() {
+	c.index++
+	l := len(c.handlers)
+	for ; c.index < l; c.index++ {
+		c.handlers[c.index](c)
+	}
 }

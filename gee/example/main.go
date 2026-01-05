@@ -3,12 +3,44 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/loveRyujin/gee"
 )
 
+func logMiddleware() gee.Handler {
+	return func(c *gee.Context) {
+		now := time.Now()
+
+		c.Next()
+
+		log.Printf("Time costing is %vns", time.Since(now).Nanoseconds())
+	}
+}
+
+func middlewareV1() gee.Handler {
+	return func(c *gee.Context) {
+		log.Println("v1 middleware begin")
+
+		c.Next()
+
+		log.Println("v1 middleware end")
+	}
+}
+
+func middlewareV2() gee.Handler {
+	return func(c *gee.Context) {
+		log.Println("v2 middleware begin")
+
+		c.Next()
+
+		log.Println("v2 middleware end")
+	}
+}
+
 func main() {
 	r := gee.New()
+	r.Use(logMiddleware())
 	r.GET("/", func(c *gee.Context) {
 		c.JSON(http.StatusOK, gee.H{
 			"msg": "success!",
@@ -26,10 +58,13 @@ func main() {
 		c.JSON(http.StatusOK, gee.H{"filepath": c.Param("filepath")})
 	})
 
-	g := r.Group("/v1")
-	g.GET("/hello", func(c *gee.Context) {
+	v1 := r.Group("/v1")
+	v1.Use(middlewareV1())
+	v2 := v1.Group("/v2")
+	v2.Use(middlewareV2())
+	v2.GET("/hello", func(c *gee.Context) {
 		c.JSON(http.StatusOK, gee.H{
-			"msg": "hi, v1 group!",
+			"msg": "This is v1 and v2 group!",
 		})
 	})
 

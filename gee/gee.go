@@ -1,8 +1,8 @@
 package gee
 
 import (
-	"log"
 	"net/http"
+	"strings"
 )
 
 type Handler func(c *Context)
@@ -10,6 +10,7 @@ type Handler func(c *Context)
 type Engine struct {
 	*RouteGroup
 	router *router
+	groups []*RouteGroup
 }
 
 func New() *Engine {
@@ -19,6 +20,7 @@ func New() *Engine {
 		handlers: nil,
 		engine:   e,
 	}
+	e.groups = append(e.groups, e.RouteGroup)
 
 	return e
 }
@@ -40,7 +42,15 @@ func (e *Engine) Run(addr string) error {
 }
 
 func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var handlers HandlerChain
+	for _, group := range e.groups {
+		if group != nil && strings.HasPrefix(r.URL.Path, group.prefix) {
+			handlers = append(handlers, group.handlers...)
+		}
+	}
+
 	c := newContext(w, r)
+	c.handlers = handlers
 	e.router.handle(c)
 }
 
@@ -55,16 +65,21 @@ type RouteGroup struct {
 func (g *RouteGroup) Group(prefix string) *RouteGroup {
 	e := g.engine
 	newGroup := &RouteGroup{
-		prefix: g.prefix + prefix,
-		engine: e,
+		prefix:   g.prefix + prefix,
+		handlers: nil,
+		engine:   e,
 	}
+	e.groups = append(e.groups, newGroup)
 
 	return newGroup
 }
 
+func (g *RouteGroup) Use(handlers ...Handler) {
+	g.handlers = append(g.handlers, handlers...)
+}
+
 func (g *RouteGroup) addRoute(method, pattern string, handler Handler) {
 	pattern = g.prefix + pattern
-	log.Printf("Route %4s - %s", method, pattern)
 	g.engine.router.addRoute(method, pattern, handler)
 }
 
