@@ -287,3 +287,235 @@ func TestRouteGroup_RootGroup(t *testing.T) {
 	}
 }
 
+func TestRouteGroup_Use(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupGroup     func(*Engine) *RouteGroup
+		middlewares    []Handler
+		requestPath    string
+		expectedBody   string
+		expectedStatus int
+	}{
+		{
+			name: "single middleware",
+			setupGroup: func(e *Engine) *RouteGroup {
+				group := e.Group("/api")
+				group.Use(func(c *Context) {
+					c.SetHeader("X-Middleware", "true")
+					c.Next()
+				})
+				return group
+			},
+			middlewares: []Handler{
+				func(c *Context) {
+					c.SetHeader("X-Middleware", "true")
+					c.Next()
+				},
+			},
+			requestPath:    "/api/test",
+			expectedBody:   "Test",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "multiple middlewares",
+			setupGroup: func(e *Engine) *RouteGroup {
+				group := e.Group("/api")
+				group.Use(
+					func(c *Context) {
+						c.SetHeader("X-Middleware-1", "true")
+						c.Next()
+					},
+					func(c *Context) {
+						c.SetHeader("X-Middleware-2", "true")
+						c.Next()
+					},
+				)
+				return group
+			},
+			middlewares: []Handler{
+				func(c *Context) {
+					c.SetHeader("X-Middleware-1", "true")
+					c.Next()
+				},
+				func(c *Context) {
+					c.SetHeader("X-Middleware-2", "true")
+					c.Next()
+				},
+			},
+			requestPath:    "/api/test",
+			expectedBody:   "Test",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "middleware modifies response",
+			setupGroup: func(e *Engine) *RouteGroup {
+				group := e.Group("/api")
+				group.Use(func(c *Context) {
+					c.w.Write([]byte("Middleware: "))
+					c.Next()
+				})
+				return group
+			},
+			middlewares: []Handler{
+				func(c *Context) {
+					c.w.Write([]byte("Middleware: "))
+					c.Next()
+				},
+			},
+			requestPath:    "/api/test",
+			expectedBody:   "Middleware: Test",
+			expectedStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := New()
+			group := tt.setupGroup(e)
+
+			group.GET("/test", func(c *Context) {
+				c.Status(http.StatusOK)
+				c.w.Write([]byte("Test"))
+			})
+
+			req := httptest.NewRequest("GET", tt.requestPath, nil)
+			rr := httptest.NewRecorder()
+
+			e.ServeHTTP(rr, req)
+
+			if rr.Code != tt.expectedStatus {
+				t.Errorf("Expected status code %d, got %d", tt.expectedStatus, rr.Code)
+			}
+
+			if rr.Body.String() != tt.expectedBody {
+				t.Errorf("Expected body %q, got %q", tt.expectedBody, rr.Body.String())
+			}
+		})
+	}
+}
+
+func TestRouteGroup_Use_MiddlewareOrder(t *testing.T) {
+	e := New()
+
+	executionOrder := make([]string, 0)
+
+	apiGroup := e.Group("/api")
+	apiGroup.Use(func(c *Context) {
+		executionOrder = append(executionOrder, "middleware-1")
+		c.Next()
+	})
+	apiGroup.Use(func(c *Context) {
+		executionOrder = append(executionOrder, "middleware-2")
+		c.Next()
+	})
+
+	apiGroup.GET("/test", func(c *Context) {
+		executionOrder = append(executionOrder, "handler")
+		c.Status(http.StatusOK)
+		c.w.Write([]byte("OK"))
+	})
+
+	req := httptest.NewRequest("GET", "/api/test", nil)
+	rr := httptest.NewRecorder()
+
+	e.ServeHTTP(rr, req)
+
+	expectedOrder := []string{"middleware-1", "middleware-2", "handler"}
+	if len(executionOrder) != len(expectedOrder) {
+		t.Errorf("Expected %d executions, got %d. Order: %v", len(expectedOrder), len(executionOrder), executionOrder)
+		return
+	}
+
+	for i, expected := range expectedOrder {
+		if executionOrder[i] != expected {
+			t.Errorf("Expected order[%d] = %q, got %q. Full order: %v", i, expected, executionOrder[i], executionOrder)
+		}
+	}
+}
+
+func TestRouteGroup_Use_NestedGroups(t *testing.T) {
+	e := New()
+
+	executionOrder := make([]string, 0)
+
+	// 根组中间件
+	e.Use(func(c *Context) {
+		executionOrder = append(executionOrder, "root-middleware")
+		c.Next()
+	})
+
+	// API 组中间件
+	apiGroup := e.Group("/api")
+	apiGroup.Use(func(c *Context) {
+		executionOrder = append(executionOrder, "api-middleware")
+		c.Next()
+	})
+
+	// V1 组中间件
+	v1Group := apiGroup.Group("/v1")
+	v1Group.Use(func(c *Context) {
+		executionOrder = append(executionOrder, "v1-middleware")
+		c.Next()
+	})
+
+	v1Group.GET("/users", func(c *Context) {
+		executionOrder = append(executionOrder, "handler")
+		c.Status(http.StatusOK)
+		c.w.Write([]byte("Users"))
+	})
+
+	req := httptest.NewRequest("GET", "/api/v1/users", nil)
+	rr := httptest.NewRecorder()
+
+	e.ServeHTTP(rr, req)
+
+	// 注意：当前实现中，所有匹配前缀的组的中间件都会被添加
+	// 根组的前缀是 ""，所以所有路径都会匹配
+	expectedOrder := []string{"root-middleware", "api-middleware", "v1-middleware", "handler"}
+	if len(executionOrder) != len(expectedOrder) {
+		t.Errorf("Expected %d executions, got %d. Order: %v", len(expectedOrder), len(executionOrder), executionOrder)
+		return
+	}
+
+	for i, expected := range expectedOrder {
+		if executionOrder[i] != expected {
+			t.Errorf("Expected order[%d] = %q, got %q. Full order: %v", i, expected, executionOrder[i], executionOrder)
+		}
+	}
+}
+
+func TestRouteGroup_Use_MiddlewareWithoutNext(t *testing.T) {
+	e := New()
+
+	apiGroup := e.Group("/api")
+	apiGroup.Use(func(c *Context) {
+		c.Status(http.StatusForbidden)
+		c.w.Write([]byte("Forbidden"))
+		// 不调用 c.Next()，但 Next() 会自动继续执行后续 handler
+		// 这是因为 Next() 的实现会遍历所有 handler
+	})
+
+	apiGroup.GET("/test", func(c *Context) {
+		c.Status(http.StatusOK)
+		c.w.Write([]byte("Test"))
+	})
+
+	req := httptest.NewRequest("GET", "/api/test", nil)
+	rr := httptest.NewRecorder()
+
+	e.ServeHTTP(rr, req)
+
+	// 注意：当前 Next() 实现会自动继续执行，即使中间件没有调用 Next()
+	// 这是因为 Next() 使用 for 循环遍历所有 handler
+	// WriteHeader 只能调用一次，中间件先设置了 403，所以最终状态码是 403
+	// 路由 handler 的 WriteHeader(200) 会被忽略
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("Expected status code %d, got %d", http.StatusForbidden, rr.Code)
+	}
+
+	// 中间件和 handler 都会执行，因为 Next() 的 for 循环会继续
+	// 但中间件先设置了状态码，所以最终状态码是 403
+	if rr.Body.String() != "ForbiddenTest" {
+		t.Errorf("Expected body 'ForbiddenTest', got %q", rr.Body.String())
+	}
+}

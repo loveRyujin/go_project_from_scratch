@@ -628,3 +628,131 @@ func TestContext_Data(t *testing.T) {
 		})
 	}
 }
+
+func TestContext_Next(t *testing.T) {
+	tests := []struct {
+		name           string
+		handlers       []Handler
+		expectedOutput string
+		expectedOrder  []string
+	}{
+		{
+			name: "single handler",
+			handlers: []Handler{
+				func(c *Context) {
+					c.w.Write([]byte("handler1"))
+				},
+			},
+			expectedOutput: "handler1",
+			expectedOrder:  []string{"handler1"},
+		},
+		{
+			name: "multiple handlers in order",
+			handlers: []Handler{
+				func(c *Context) {
+					c.w.Write([]byte("handler1"))
+					c.Next()
+				},
+				func(c *Context) {
+					c.w.Write([]byte("handler2"))
+					c.Next()
+				},
+				func(c *Context) {
+					c.w.Write([]byte("handler3"))
+				},
+			},
+			expectedOutput: "handler1handler2handler3",
+			expectedOrder:  []string{"handler1", "handler2", "handler3"},
+		},
+		{
+			name: "handler without Next stops chain",
+			handlers: []Handler{
+				func(c *Context) {
+					c.w.Write([]byte("handler1"))
+					// 不调用 Next()，但 Next() 会自动继续执行后续 handler
+				},
+				func(c *Context) {
+					c.w.Write([]byte("handler2"))
+				},
+			},
+			expectedOutput: "handler1handler2",
+			expectedOrder:  []string{"handler1", "handler2"},
+		},
+		{
+			name:           "empty handlers",
+			handlers:       []Handler{},
+			expectedOutput: "",
+			expectedOrder:  []string{},
+		},
+		{
+			name: "handler calls Next multiple times",
+			handlers: []Handler{
+				func(c *Context) {
+					c.w.Write([]byte("handler1"))
+					c.Next()
+					c.w.Write([]byte("after-next"))
+				},
+				func(c *Context) {
+					c.w.Write([]byte("handler2"))
+				},
+			},
+			expectedOutput: "handler1handler2after-next",
+			expectedOrder:  []string{"handler1", "handler2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/test", nil)
+			rr := httptest.NewRecorder()
+
+			c := newContext(rr, req)
+			c.handlers = tt.handlers
+
+			c.Next()
+
+			if rr.Body.String() != tt.expectedOutput {
+				t.Errorf("Expected output %q, got %q", tt.expectedOutput, rr.Body.String())
+			}
+		})
+	}
+}
+
+func TestContext_Next_ExecutionOrder(t *testing.T) {
+	req := httptest.NewRequest("GET", "/test", nil)
+	rr := httptest.NewRecorder()
+
+	c := newContext(rr, req)
+
+	executionOrder := make([]string, 0)
+
+	c.handlers = []Handler{
+		func(c *Context) {
+			executionOrder = append(executionOrder, "before-next-1")
+			c.Next()
+			executionOrder = append(executionOrder, "after-next-1")
+		},
+		func(c *Context) {
+			executionOrder = append(executionOrder, "before-next-2")
+			c.Next()
+			executionOrder = append(executionOrder, "after-next-2")
+		},
+		func(c *Context) {
+			executionOrder = append(executionOrder, "handler-3")
+		},
+	}
+
+	c.Next()
+
+	expectedOrder := []string{"before-next-1", "before-next-2", "handler-3", "after-next-2", "after-next-1"}
+	if len(executionOrder) != len(expectedOrder) {
+		t.Errorf("Expected %d executions, got %d. Order: %v", len(expectedOrder), len(executionOrder), executionOrder)
+		return
+	}
+
+	for i, expected := range expectedOrder {
+		if executionOrder[i] != expected {
+			t.Errorf("Expected order[%d] = %q, got %q. Full order: %v", i, expected, executionOrder[i], executionOrder)
+		}
+	}
+}
