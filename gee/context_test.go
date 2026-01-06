@@ -756,3 +756,81 @@ func TestContext_Next_ExecutionOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestContext_Fail(t *testing.T) {
+	tests := []struct {
+		name           string
+		code           int
+		errMsg         string
+		expectedStatus int
+		expectedBody   string
+		checkHeader    bool
+	}{
+		{
+			name:           "fail with internal server error",
+			code:           http.StatusInternalServerError,
+			errMsg:         "Internal server error",
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   "Internal server error",
+			checkHeader:    true,
+		},
+		{
+			name:           "fail with bad request",
+			code:           http.StatusBadRequest,
+			errMsg:         "Bad request",
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Bad request",
+			checkHeader:    true,
+		},
+		{
+			name:           "fail with forbidden",
+			code:           http.StatusForbidden,
+			errMsg:         "Access forbidden",
+			expectedStatus: http.StatusForbidden,
+			expectedBody:   "Access forbidden",
+			checkHeader:    true,
+		},
+		{
+			name:           "fail with empty message",
+			code:           http.StatusInternalServerError,
+			errMsg:         "",
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   "",
+			checkHeader:    true,
+		},
+		{
+			name:           "fail with custom error message",
+			code:           http.StatusNotFound,
+			errMsg:         "Resource not found: /users/123",
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   "Resource not found: /users/123",
+			checkHeader:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/test", nil)
+			rr := httptest.NewRecorder()
+
+			c := newContext(rr, req)
+
+			c.Fail(tt.code, tt.errMsg)
+
+			if rr.Code != tt.expectedStatus {
+				t.Errorf("Expected status code %d, got %d", tt.expectedStatus, rr.Code)
+			}
+
+			if rr.Body.String() != tt.expectedBody {
+				t.Errorf("Expected body %q, got %q", tt.expectedBody, rr.Body.String())
+			}
+
+			if tt.checkHeader {
+				contentType := rr.Header().Get("Content-Type")
+				if contentType != "test/plain" {
+					t.Errorf("Expected Content-Type test/plain, got %s", contentType)
+				}
+			}
+		})
+	}
+}

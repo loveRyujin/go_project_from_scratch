@@ -87,3 +87,9 @@ func (c *Context) Next() {
 		c.handlers[c.index](c)
 	}
 }
+
+func (c *Context) Fail(code int, errMsg string) {
+	c.SetHeader("Content-Type", "test/plain")
+	c.Status(code)
+	c.w.Write([]byte(errMsg))
+}

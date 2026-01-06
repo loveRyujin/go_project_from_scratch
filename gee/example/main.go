@@ -39,7 +39,7 @@ func middlewareV2() gee.Handler {
 }
 
 func main() {
-	r := gee.New()
+	r := gee.Default()
 	r.Use(logMiddleware())
 	r.GET("/", func(c *gee.Context) {
 		c.JSON(http.StatusOK, gee.H{
@@ -56,6 +56,10 @@ func main() {
 	})
 	r.GET("/assets/*filepath", func(c *gee.Context) {
 		c.JSON(http.StatusOK, gee.H{"filepath": c.Param("filepath")})
+	})
+	r.GET("/panic", func(c *gee.Context) {
+		s := []string{"1", "2", "3"}
+		c.String(http.StatusOK, "get %s", s[3])
 	})
 
 	v1 := r.Group("/v1")

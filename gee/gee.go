@@ -25,6 +25,18 @@ func New() *Engine {
 	return e
 }
 
+func Default() *Engine {
+	e := &Engine{router: newRouter()}
+	e.RouteGroup = &RouteGroup{
+		prefix:   "",
+		handlers: HandlerChain{Recovery()},
+		engine:   e,
+	}
+	e.groups = append(e.groups, e.RouteGroup)
+
+	return e
+}
+
 func (e *Engine) addRoute(method, pattern string, handler Handler) {
 	e.router.addRoute(method, pattern, handler)
 }
