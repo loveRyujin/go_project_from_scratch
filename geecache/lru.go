@@ -67,7 +67,11 @@ func (c *Cache) Add(key string, value Value) {
 		c.cache[key] = ele
 		c.usedBytes += int64(len(key)) + int64(value.Len())
 	}
-	for c.maxBytes != 0 && c.maxBytes < c.usedBytes {
+	for c.maxBytes < c.usedBytes {
 		c.RemoveOldest()
 	}
+}
+
+func (c *Cache) Len() int {
+	return c.dl.Len()
 }
