@@ -13,7 +13,7 @@ type Loader interface {
 type LoadFunc func(key string) ([]byte, error)
 
 func (lf LoadFunc) Load(key string) ([]byte, error) {
-	return lf.Load(key)
+	return lf(key)
 }
 
 var (
