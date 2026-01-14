@@ -2,8 +2,10 @@ package geecache
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -64,4 +66,30 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Write(v.ByteSlice())
+}
+
+type httpGetter struct {
+	baseURL string
+}
+
+var _ PeerGetter = (*httpGetter)(nil)
+
+func (hg *httpGetter) Get(group, key string) ([]byte, error) {
+	url := fmt.Sprintf("%v/%v/%v", hg.baseURL, url.QueryEscape(group), url.QueryEscape(key))
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned: %v", resp.Status)
+	}
+
+	bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %v", err)
+	}
+
+	return bytes, nil
 }
