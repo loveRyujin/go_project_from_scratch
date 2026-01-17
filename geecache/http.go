@@ -119,7 +119,8 @@ var _ PeerGetter = (*httpGetter)(nil)
 
 func (hg *httpGetter) Get(group, key string) ([]byte, error) {
 	// example: http://localhost:8080/geecache/{:group}/{:key}
-	url := fmt.Sprintf("%v/%v/%v", hg.baseURL, url.QueryEscape(group), url.QueryEscape(key))
+	url := fmt.Sprintf("%v%v/%v", hg.baseURL, url.QueryEscape(group), url.QueryEscape(key))
+	log.Println(url)
 	resp, err := hg.client.Get(url)
 	if err != nil {
 		return nil, err

@@ -75,13 +75,15 @@ func (g *Group) Get(key string) (ByteView, error) {
 }
 
 func (g *Group) load(key string) (ByteView, error) {
-	p, ok := g.peers.Seek(key)
-	if ok {
-		res, err := g.getFromPeer(p, key)
-		if err == nil {
-			return res, nil
+	if g.peers != nil {
+		p, ok := g.peers.Seek(key)
+		if ok {
+			res, err := g.getFromPeer(p, key)
+			if err == nil {
+				return res, nil
+			}
+			log.Println("[GeeCache] Failed to get from peer:", err)
 		}
-		log.Println("[GeeCache] Failed to get from peer:", err)
 	}
 
 	return g.getLocally(key)
