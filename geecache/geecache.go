@@ -2,6 +2,7 @@ package geecache
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 )
@@ -25,6 +26,7 @@ type Group struct {
 	maincache *cache
 	loader    Loader
 	name      string
+	peers     PeerSeeker
 }
 
 func NewGroup(name string, cacheBytes int64, loader Loader) *Group {
@@ -52,6 +54,13 @@ func GetGroup(name string) *Group {
 	return g
 }
 
+func (g *Group) RegisterPeers(peers PeerSeeker) {
+	if g.peers != nil {
+		panic("RegisterPeerPicker called more than once")
+	}
+	g.peers = peers
+}
+
 func (g *Group) Get(key string) (ByteView, error) {
 	if key == "" {
 		return ByteView{}, errors.New("key is empty")
@@ -66,7 +75,29 @@ func (g *Group) Get(key string) (ByteView, error) {
 }
 
 func (g *Group) load(key string) (ByteView, error) {
+	p, ok := g.peers.Seek(key)
+	if ok {
+		res, err := g.getFromPeer(p, key)
+		if err == nil {
+			return res, nil
+		}
+		log.Println("[GeeCache] Failed to get from peer:", err)
+	}
+
 	return g.getLocally(key)
+}
+
+func (g *Group) getFromPeer(peer PeerGetter, key string) (ByteView, error) {
+	if peer == nil {
+		return ByteView{}, fmt.Errorf("peer is empty")
+	}
+
+	res, err := peer.Get(g.name, key)
+	if err != nil {
+		return ByteView{}, err
+	}
+
+	return ByteView{b: cloneBytes(res)}, nil
 }
 
 func (g *Group) getLocally(key string) (ByteView, error) {

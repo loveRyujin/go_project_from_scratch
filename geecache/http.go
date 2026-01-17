@@ -7,32 +7,35 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
+
+	"github.com/loveRyujin/geecache/consistenthash"
 )
 
-const defaultPath = "/geecache/"
+const (
+	defaultPath     = "/geecache/"
+	defaultReplicas = 10
+)
 
-type Server struct {
-	basepath string
-	selfaddr string
+type HTTPPool struct {
+	basepath    string
+	selfaddr    string
+	mu          sync.Mutex
+	peers       *consistenthash.Ring
+	httpGetters map[string]*httpGetter
 }
 
-func NewServer(selfaddr string) *Server {
-	return &Server{
+var _ PeerSeeker = (*HTTPPool)(nil)
+
+func NewHTTPPool(selfaddr string) *HTTPPool {
+	return &HTTPPool{
 		basepath: defaultPath,
 		selfaddr: selfaddr,
 	}
 }
 
-func (s *Server) error(w http.ResponseWriter, code int, format string, args ...any) {
-	s.log(format, args...)
-	http.Error(w, fmt.Sprintf(format, args...), code)
-}
-
-func (s *Server) log(format string, args ...any) {
-	log.Printf("[Server %s] %s", s.selfaddr, fmt.Sprintf(format, args...))
-}
-
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.log("Method: %s, Path: %s", r.Method, r.URL.Path)
 
 	// request example:
@@ -68,15 +71,56 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Write(v.ByteSlice())
 }
 
+func (s *HTTPPool) Set(peers ...string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.peers = consistenthash.New(defaultReplicas, nil)
+	s.peers.Add(peers...)
+	s.httpGetters = make(map[string]*httpGetter, len(peers))
+	for _, peer := range peers {
+		s.httpGetters[peer] = &httpGetter{
+			baseURL: peer + s.basepath,
+			client: &http.Client{
+				Timeout: 5 * time.Second, // 设置5秒超时
+			},
+		}
+	}
+}
+
+func (s *HTTPPool) Seek(key string) (PeerGetter, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	peer := s.peers.Get(key)
+	if peer == "" || peer == s.selfaddr {
+		return nil, false
+	}
+
+	s.log("Pick peer %s", peer)
+	return s.httpGetters[peer], true
+}
+
+func (s *HTTPPool) error(w http.ResponseWriter, code int, format string, args ...any) {
+	s.log(format, args...)
+	http.Error(w, fmt.Sprintf(format, args...), code)
+}
+
+func (s *HTTPPool) log(format string, args ...any) {
+	log.Printf("[Server %s] %s", s.selfaddr, fmt.Sprintf(format, args...))
+}
+
 type httpGetter struct {
 	baseURL string
+	client  *http.Client
 }
 
 var _ PeerGetter = (*httpGetter)(nil)
 
 func (hg *httpGetter) Get(group, key string) ([]byte, error) {
+	// example: http://localhost:8080/geecache/{:group}/{:key}
 	url := fmt.Sprintf("%v/%v/%v", hg.baseURL, url.QueryEscape(group), url.QueryEscape(key))
-	resp, err := http.Get(url)
+	resp, err := hg.client.Get(url)
 	if err != nil {
 		return nil, err
 	}
