@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"sync"
+
+	"github.com/loveRyujin/geecache/singleflight"
 )
 
 type Loader interface {
@@ -23,10 +25,11 @@ var (
 )
 
 type Group struct {
-	maincache *cache
-	loader    Loader
-	name      string
-	peers     PeerSeeker
+	maincache    *cache
+	loader       Loader
+	name         string
+	peers        PeerSeeker
+	singleflight *singleflight.Group
 }
 
 func NewGroup(name string, cacheBytes int64, loader Loader) *Group {
@@ -35,9 +38,10 @@ func NewGroup(name string, cacheBytes int64, loader Loader) *Group {
 	}
 
 	g := &Group{
-		name:      name,
-		maincache: &cache{cacheBytes: cacheBytes},
-		loader:    loader,
+		name:         name,
+		maincache:    &cache{cacheBytes: cacheBytes},
+		loader:       loader,
+		singleflight: &singleflight.Group{},
 	}
 	rwmu.Lock()
 	groups[name] = g
@@ -75,18 +79,25 @@ func (g *Group) Get(key string) (ByteView, error) {
 }
 
 func (g *Group) load(key string) (ByteView, error) {
-	if g.peers != nil {
-		p, ok := g.peers.Seek(key)
-		if ok {
-			res, err := g.getFromPeer(p, key)
-			if err == nil {
-				return res, nil
+	val, err := g.singleflight.Do(key, func() (any, error) {
+		if g.peers != nil {
+			p, ok := g.peers.Seek(key)
+			if ok {
+				res, err := g.getFromPeer(p, key)
+				if err == nil {
+					return res, nil
+				}
+				log.Println("[GeeCache] Failed to get from peer:", err)
 			}
-			log.Println("[GeeCache] Failed to get from peer:", err)
 		}
+
+		return g.getLocally(key)
+	})
+	if err != nil {
+		return ByteView{}, err
 	}
 
-	return g.getLocally(key)
+	return val.(ByteView), nil
 }
 
 func (g *Group) getFromPeer(peer PeerGetter, key string) (ByteView, error) {
