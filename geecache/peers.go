@@ -1,9 +1,11 @@
 package geecache
 
+import "github.com/loveRyujin/geecache/geecachepb"
+
 type PeerSeeker interface {
 	Seek(key string) (peer PeerGetter, ok bool)
 }
 
 type PeerGetter interface {
-	Get(group, key string) ([]byte, error)
+	Get(in *geecachepb.Request) (out *geecachepb.Response, err error)
 }

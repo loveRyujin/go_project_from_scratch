@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/loveRyujin/geecache/consistenthash"
+	"github.com/loveRyujin/geecache/geecachepb"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -67,8 +69,14 @@ func (s *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	data, err := proto.Marshal(&geecachepb.Response{Value: v.ByteSlice()})
+	if err != nil {
+		s.error(w, http.StatusInternalServerError, "proto marshal error: %v", err.Error())
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Write(v.ByteSlice())
+	w.Write(data)
 }
 
 func (s *HTTPPool) Set(peers ...string) {
@@ -117,9 +125,9 @@ type httpGetter struct {
 
 var _ PeerGetter = (*httpGetter)(nil)
 
-func (hg *httpGetter) Get(group, key string) ([]byte, error) {
+func (hg *httpGetter) Get(in *geecachepb.Request) (*geecachepb.Response, error) {
 	// example: http://localhost:8080/geecache/{:group}/{:key}
-	url := fmt.Sprintf("%v%v/%v", hg.baseURL, url.QueryEscape(group), url.QueryEscape(key))
+	url := fmt.Sprintf("%v%v/%v", hg.baseURL, url.QueryEscape(in.Group), url.QueryEscape(in.Key))
 	log.Println(url)
 	resp, err := hg.client.Get(url)
 	if err != nil {
@@ -136,5 +144,10 @@ func (hg *httpGetter) Get(group, key string) ([]byte, error) {
 		return nil, fmt.Errorf("reading response body: %v", err)
 	}
 
-	return bytes, nil
+	out := &geecachepb.Response{}
+	if err = proto.Unmarshal(bytes, out); err != nil {
+		return nil, fmt.Errorf("decoding response body: %v", err)
+	}
+
+	return out, nil
 }

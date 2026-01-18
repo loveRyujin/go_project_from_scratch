@@ -6,6 +6,7 @@ import (
 	"log"
 	"sync"
 
+	"github.com/loveRyujin/geecache/geecachepb"
 	"github.com/loveRyujin/geecache/singleflight"
 )
 
@@ -105,12 +106,16 @@ func (g *Group) getFromPeer(peer PeerGetter, key string) (ByteView, error) {
 		return ByteView{}, fmt.Errorf("peer is empty")
 	}
 
-	res, err := peer.Get(g.name, key)
+	in := &geecachepb.Request{
+		Group: g.name,
+		Key:   key,
+	}
+	res, err := peer.Get(in)
 	if err != nil {
 		return ByteView{}, err
 	}
 
-	return ByteView{b: cloneBytes(res)}, nil
+	return ByteView{b: res.Value}, nil
 }
 
 func (g *Group) getLocally(key string) (ByteView, error) {
