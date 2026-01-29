@@ -4,8 +4,11 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/loveRyujin/geeorm/dialect"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+var testDialect, _ = dialect.GetDialect("sqlite3")
 
 func newTestDB(t *testing.T) *sql.DB {
 	db, err := sql.Open("sqlite3", ":memory:")
@@ -15,11 +18,16 @@ func newTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
+func newTestSession(t *testing.T) (*Session, func()) {
+	db := newTestDB(t)
+	return New(db, testDialect), func() { db.Close() }
+}
+
 func TestSession_New(t *testing.T) {
 	db := newTestDB(t)
 	defer db.Close()
 
-	s := New(db)
+	s := New(db, testDialect)
 	if s == nil {
 		t.Fatal("expected session, got nil")
 	}
@@ -29,10 +37,9 @@ func TestSession_New(t *testing.T) {
 }
 
 func TestSession_Raw(t *testing.T) {
-	db := newTestDB(t)
-	defer db.Close()
+	s, cleanup := newTestSession(t)
+	defer cleanup()
 
-	s := New(db)
 	s.Raw("SELECT * FROM users WHERE id = ?", 1)
 
 	if s.sql.String() != "SELECT * FROM users WHERE id = ? " {
@@ -44,10 +51,9 @@ func TestSession_Raw(t *testing.T) {
 }
 
 func TestSession_Clear(t *testing.T) {
-	db := newTestDB(t)
-	defer db.Close()
+	s, cleanup := newTestSession(t)
+	defer cleanup()
 
-	s := New(db)
 	s.Raw("SELECT 1", 1, 2, 3)
 	s.Clear()
 
@@ -60,10 +66,9 @@ func TestSession_Clear(t *testing.T) {
 }
 
 func TestSession_Exec(t *testing.T) {
-	db := newTestDB(t)
-	defer db.Close()
+	s, cleanup := newTestSession(t)
+	defer cleanup()
 
-	s := New(db)
 	// 创建表
 	s.Raw("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
 	_, err := s.Exec()
@@ -84,10 +89,9 @@ func TestSession_Exec(t *testing.T) {
 }
 
 func TestSession_QueryRow(t *testing.T) {
-	db := newTestDB(t)
-	defer db.Close()
+	s, cleanup := newTestSession(t)
+	defer cleanup()
 
-	s := New(db)
 	// 准备数据
 	s.Raw("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
 	s.Exec()
@@ -107,10 +111,9 @@ func TestSession_QueryRow(t *testing.T) {
 }
 
 func TestSession_QueryRows(t *testing.T) {
-	db := newTestDB(t)
-	defer db.Close()
+	s, cleanup := newTestSession(t)
+	defer cleanup()
 
-	s := New(db)
 	// 准备数据
 	s.Raw("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
 	s.Exec()

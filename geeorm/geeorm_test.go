@@ -3,6 +3,7 @@ package geeorm
 import (
 	"testing"
 
+	_ "github.com/loveRyujin/geeorm/dialect"
 	_ "github.com/mattn/go-sqlite3"
 )
 
