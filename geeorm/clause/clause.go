@@ -30,7 +30,7 @@ func (c *Clause) Set(name Type, vars ...any) {
 
 func (c *Clause) Build(orders ...Type) (string, []any) {
 	var sqls []string
-	var vars []interface{}
+	var vars []any
 	for _, order := range orders {
 		if sql, ok := c.sql[order]; ok {
 			sqls = append(sqls, sql)

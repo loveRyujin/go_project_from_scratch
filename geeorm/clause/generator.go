@@ -28,6 +28,7 @@ func genBindVars(num int) string {
 }
 
 func _insert(vals ...any) (string, []any) {
+	// INSERT INTO $tableName ($fields)
 	tableName := vals[0]
 	vars := strings.Join(vals[1].([]string), ",")
 	return fmt.Sprintf("INSERT INTO %s (%v)", tableName, vars), []any{}
@@ -54,16 +55,19 @@ func _values(vals ...any) (string, []any) {
 }
 
 func _select(vals ...any) (string, []any) {
+	// SELECT $fields FROM $tableName
 	tableName := vals[0]
 	fields := strings.Join(vals[1].([]string), ",")
 	return fmt.Sprintf("SELECT %v FROM %s", fields, tableName), []any{}
 }
 
 func _limit(vals ...any) (string, []any) {
+	// LIMIT $num
 	return "LIMIT ?", vals
 }
 
 func _where(vals ...any) (string, []any) {
+	// WHERE $desc
 	desc, vars := vals[0], vals[1:]
 	return fmt.Sprintf("WHERE %s", desc), vars
 }
