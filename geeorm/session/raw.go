@@ -5,12 +5,14 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/loveRyujin/geeorm/clause"
 	"github.com/loveRyujin/geeorm/dialect"
 	schemas "github.com/loveRyujin/geeorm/schema"
 )
 
 type Session struct {
 	raw      *sql.DB
+	clause   clause.Clause
 	sql      strings.Builder
 	sqlVars  []any
 	dialect  dialect.Dialect
