@@ -1,6 +1,7 @@
 package session
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -196,4 +197,22 @@ func (s *Session) Where(desc string, args ...any) *Session {
 func (s *Session) OrderBy(field string, desc bool) *Session {
 	s.clause.Set(clause.ORDERBY, field, desc)
 	return s
+}
+
+// First 查询第一条匹配的记录，结果填充到传入的结构体指针中。
+// val 必须是结构体指针。未找到记录时返回 "record not found" 错误。
+//
+//	var user User
+//	s.Where("Name = ?", "Tom").First(&user)
+func (s *Session) First(val any) error {
+	dest := reflect.Indirect(reflect.ValueOf(val))
+	destSlice := reflect.New(reflect.SliceOf(dest.Type())).Elem()
+	if err := s.Limit(1).Find(destSlice.Addr().Interface()); err != nil {
+		return err
+	}
+	if destSlice.Len() == 0 {
+		return errors.New("record not found")
+	}
+	dest.Set(destSlice.Index(0))
+	return nil
 }

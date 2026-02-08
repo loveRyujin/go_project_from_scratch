@@ -337,6 +337,55 @@ func TestSession_ChainCall(t *testing.T) {
 	}
 }
 
+func TestSession_First(t *testing.T) {
+	s, cleanup := testRecordInit(t)
+	defer cleanup()
+
+	_, _ = s.Insert(&User{"Tom", 18}, &User{"Sam", 25})
+
+	// 查询第一条记录
+	var user User
+	err := s.OrderBy("Age", false).First(&user)
+	if err != nil {
+		t.Fatalf("failed to get first: %v", err)
+	}
+	if user.Name != "Tom" || user.Age != 18 {
+		t.Errorf("expected {Tom, 18}, got {%s, %d}", user.Name, user.Age)
+	}
+}
+
+func TestSession_First_WithWhere(t *testing.T) {
+	s, cleanup := testRecordInit(t)
+	defer cleanup()
+
+	_, _ = s.Insert(&User{"Tom", 18}, &User{"Sam", 25})
+
+	// 按条件查询第一条
+	var user User
+	err := s.Where("Name = ?", "Sam").First(&user)
+	if err != nil {
+		t.Fatalf("failed to get first with where: %v", err)
+	}
+	if user.Name != "Sam" || user.Age != 25 {
+		t.Errorf("expected {Sam, 25}, got {%s, %d}", user.Name, user.Age)
+	}
+}
+
+func TestSession_First_NotFound(t *testing.T) {
+	s, cleanup := testRecordInit(t)
+	defer cleanup()
+
+	// 空表查询应返回 "record not found"
+	var user User
+	err := s.First(&user)
+	if err == nil {
+		t.Fatal("expected error for empty table")
+	}
+	if err.Error() != "record not found" {
+		t.Errorf("expected 'record not found', got '%s'", err.Error())
+	}
+}
+
 func TestSession_Insert_InvalidParam(t *testing.T) {
 	s, cleanup := newTestSession(t)
 	defer cleanup()
