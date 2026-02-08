@@ -169,3 +169,31 @@ func (s *Session) Count() (int64, error) {
 	}
 	return num, nil
 }
+
+// Limit 设置查询的最大返回行数，支持链式调用。
+//
+//	var users []User
+//	s.Limit(3).Find(&users)
+func (s *Session) Limit(num int) *Session {
+	s.clause.Set(clause.LIMIT, num)
+	return s
+}
+
+// Where 设置查询/更新/删除的 WHERE 条件，支持链式调用。
+//
+//	s.Where("Name = ?", "Tom").Find(&users)
+//	s.Where("Age > ?", 18).Delete()
+func (s *Session) Where(desc string, args ...any) *Session {
+	query := append([]any{desc}, args...)
+	s.clause.Set(clause.WHERE, query...)
+	return s
+}
+
+// OrderBy 设置查询的排序规则，desc 为 true 时降序排列，支持链式调用。
+//
+//	s.OrderBy("Age", false).Find(&users)  // ORDER BY Age
+//	s.OrderBy("Age", true).Find(&users)   // ORDER BY Age DESC
+func (s *Session) OrderBy(field string, desc bool) *Session {
+	s.clause.Set(clause.ORDERBY, field, desc)
+	return s
+}

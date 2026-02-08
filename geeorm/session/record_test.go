@@ -2,8 +2,6 @@ package session
 
 import (
 	"testing"
-
-	"github.com/loveRyujin/geeorm/clause"
 )
 
 func testRecordInit(t *testing.T) (*Session, func()) {
@@ -137,8 +135,7 @@ func TestSession_Update_WithMap(t *testing.T) {
 	_, _ = s.Insert(&User{"Tom", 18})
 
 	// 使用 map 更新
-	s.clause.Set(clause.WHERE, "Name = ?", "Tom")
-	affected, err := s.Update(map[string]any{"Age": 25})
+	affected, err := s.Where("Name = ?", "Tom").Update(map[string]any{"Age": 25})
 	if err != nil {
 		t.Fatalf("failed to update with map: %v", err)
 	}
@@ -154,8 +151,7 @@ func TestSession_Update_WithKV(t *testing.T) {
 	_, _ = s.Insert(&User{"Tom", 18})
 
 	// 使用 kv 平铺更新
-	s.clause.Set(clause.WHERE, "Name = ?", "Tom")
-	affected, err := s.Update("Age", 30)
+	affected, err := s.Where("Name = ?", "Tom").Update("Age", 30)
 	if err != nil {
 		t.Fatalf("failed to update with kv: %v", err)
 	}
@@ -171,8 +167,7 @@ func TestSession_Update_WithStruct(t *testing.T) {
 	_, _ = s.Insert(&User{"Tom", 18})
 
 	// 使用 struct 更新
-	s.clause.Set(clause.WHERE, "Name = ?", "Tom")
-	affected, err := s.Update(User{Name: "Tom", Age: 28})
+	affected, err := s.Where("Name = ?", "Tom").Update(User{Name: "Tom", Age: 28})
 	if err != nil {
 		t.Fatalf("failed to update with struct: %v", err)
 	}
@@ -214,6 +209,131 @@ func TestSession_Update_InvalidParam(t *testing.T) {
 	_, err = s.Update("just a string")
 	if err == nil {
 		t.Error("expected error for non-struct/map single arg")
+	}
+}
+
+func TestSession_Delete(t *testing.T) {
+	s, cleanup := testRecordInit(t)
+	defer cleanup()
+
+	_, _ = s.Insert(&User{"Tom", 18}, &User{"Sam", 25})
+
+	// 按条件删除
+	affected, err := s.Where("Name = ?", "Tom").Delete()
+	if err != nil {
+		t.Fatalf("failed to delete: %v", err)
+	}
+	if affected != 1 {
+		t.Errorf("expected 1 row affected, got %d", affected)
+	}
+
+	// 验证只剩一条
+	count, _ := s.Count()
+	if count != 1 {
+		t.Errorf("expected 1 remaining record, got %d", count)
+	}
+}
+
+func TestSession_Count(t *testing.T) {
+	s, cleanup := testRecordInit(t)
+	defer cleanup()
+
+	// 空表计数
+	count, err := s.Count()
+	if err != nil {
+		t.Fatalf("failed to count: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0, got %d", count)
+	}
+
+	// 插入数据后计数
+	_, _ = s.Insert(&User{"Tom", 18}, &User{"Sam", 25}, &User{"Jack", 30})
+	count, err = s.Count()
+	if err != nil {
+		t.Fatalf("failed to count: %v", err)
+	}
+	if count != 3 {
+		t.Errorf("expected 3, got %d", count)
+	}
+}
+
+func TestSession_Limit(t *testing.T) {
+	s, cleanup := testRecordInit(t)
+	defer cleanup()
+
+	_, _ = s.Insert(&User{"Tom", 18}, &User{"Sam", 25}, &User{"Jack", 30})
+
+	var users []User
+	err := s.Limit(2).Find(&users)
+	if err != nil {
+		t.Fatalf("failed to find with limit: %v", err)
+	}
+	if len(users) != 2 {
+		t.Errorf("expected 2 users, got %d", len(users))
+	}
+}
+
+func TestSession_Where(t *testing.T) {
+	s, cleanup := testRecordInit(t)
+	defer cleanup()
+
+	_, _ = s.Insert(&User{"Tom", 18}, &User{"Sam", 25}, &User{"Jack", 30})
+
+	var users []User
+	err := s.Where("Age > ?", 20).Find(&users)
+	if err != nil {
+		t.Fatalf("failed to find with where: %v", err)
+	}
+	if len(users) != 2 {
+		t.Errorf("expected 2 users (Age > 20), got %d", len(users))
+	}
+}
+
+func TestSession_OrderBy(t *testing.T) {
+	s, cleanup := testRecordInit(t)
+	defer cleanup()
+
+	_, _ = s.Insert(&User{"Tom", 18}, &User{"Sam", 25}, &User{"Jack", 30})
+
+	// 升序
+	var users []User
+	err := s.OrderBy("Age", false).Find(&users)
+	if err != nil {
+		t.Fatalf("failed to find with order: %v", err)
+	}
+	if users[0].Name != "Tom" || users[2].Name != "Jack" {
+		t.Errorf("expected ascending order, got %v", users)
+	}
+
+	// 降序
+	var usersDesc []User
+	err = s.OrderBy("Age", true).Find(&usersDesc)
+	if err != nil {
+		t.Fatalf("failed to find with desc order: %v", err)
+	}
+	if usersDesc[0].Name != "Jack" || usersDesc[2].Name != "Tom" {
+		t.Errorf("expected descending order, got %v", usersDesc)
+	}
+}
+
+func TestSession_ChainCall(t *testing.T) {
+	s, cleanup := testRecordInit(t)
+	defer cleanup()
+
+	_, _ = s.Insert(&User{"Tom", 18}, &User{"Sam", 25}, &User{"Jack", 30}, &User{"Alice", 22})
+
+	// 链式调用: Where + OrderBy + Limit
+	var users []User
+	err := s.Where("Age > ?", 18).OrderBy("Age", true).Limit(2).Find(&users)
+	if err != nil {
+		t.Fatalf("failed chain call: %v", err)
+	}
+	if len(users) != 2 {
+		t.Errorf("expected 2 users, got %d", len(users))
+	}
+	if users[0].Name != "Jack" {
+		t.Errorf("expected first user Jack (oldest), got %s", users[0].Name)
 	}
 }
 

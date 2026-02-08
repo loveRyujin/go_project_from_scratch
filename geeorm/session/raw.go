@@ -25,10 +25,11 @@ func New(db *sql.DB, dialect dialect.Dialect) *Session {
 	return &Session{raw: db, dialect: dialect}
 }
 
-// Clear 重置 SQL 语句和参数，每次 Exec/QueryRow/QueryRows 执行后自动调用。
+// Clear 重置 SQL 语句、参数和子句状态，每次 Exec/QueryRow/QueryRows 执行后自动调用。
 func (s *Session) Clear() {
 	s.sql.Reset()
 	s.sqlVars = nil
+	s.clause = clause.Clause{}
 }
 
 // DB 返回底层的 *sql.DB 实例。

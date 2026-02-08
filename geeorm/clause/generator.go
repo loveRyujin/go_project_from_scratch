@@ -76,6 +76,10 @@ func _where(vals ...any) (string, []any) {
 }
 
 func _orderby(vals ...any) (string, []any) {
+	desc := vals[1].(bool)
+	if desc {
+		return fmt.Sprintf("ORDER BY %s DESC", vals[0]), []any{}
+	}
 	return fmt.Sprintf("ORDER BY %s", vals[0]), []any{}
 }
 
