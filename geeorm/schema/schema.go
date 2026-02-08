@@ -24,6 +24,10 @@ type Schema struct {
 	fieldMap   map[string]*Field
 }
 
+// Parse 将结构体解析为 Schema。dest 必须是结构体或结构体指针。
+// 跳过匿名字段和未导出字段，通过 `geeorm` tag 设置约束（如 PRIMARY KEY）。
+//
+//	schema, err := Parse(&User{}, dialect)
 func Parse(dest any, d dialect.Dialect) (*Schema, error) {
 	modelType := reflect.Indirect(reflect.ValueOf(dest)).Type()
 	if modelType.Kind() != reflect.Struct {
@@ -53,10 +57,13 @@ func Parse(dest any, d dialect.Dialect) (*Schema, error) {
 	return schema, nil
 }
 
+// GetField 根据字段名获取 Field，不存在时返回 nil。
 func (s *Schema) GetField(name string) *Field {
 	return s.fieldMap[name]
 }
 
+// RecordValues 提取结构体中各字段的值，按 FieldNames 顺序返回。
+// val 必须是结构体或结构体指针。
 func (s *Schema) RecordValues(val any) ([]any, error) {
 	destValue := reflect.Indirect(reflect.ValueOf(val))
 	if destValue.Kind() != reflect.Struct {

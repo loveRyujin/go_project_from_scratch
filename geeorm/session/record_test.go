@@ -2,6 +2,8 @@ package session
 
 import (
 	"testing"
+
+	"github.com/loveRyujin/geeorm/clause"
 )
 
 func testRecordInit(t *testing.T) (*Session, func()) {
@@ -125,6 +127,93 @@ func TestSession_Find_InvalidParam(t *testing.T) {
 	err = s.Find(&names)
 	if err == nil {
 		t.Error("expected error when passing non-struct slice to Find")
+	}
+}
+
+func TestSession_Update_WithMap(t *testing.T) {
+	s, cleanup := testRecordInit(t)
+	defer cleanup()
+
+	_, _ = s.Insert(&User{"Tom", 18})
+
+	// 使用 map 更新
+	s.clause.Set(clause.WHERE, "Name = ?", "Tom")
+	affected, err := s.Update(map[string]any{"Age": 25})
+	if err != nil {
+		t.Fatalf("failed to update with map: %v", err)
+	}
+	if affected != 1 {
+		t.Errorf("expected 1 row affected, got %d", affected)
+	}
+}
+
+func TestSession_Update_WithKV(t *testing.T) {
+	s, cleanup := testRecordInit(t)
+	defer cleanup()
+
+	_, _ = s.Insert(&User{"Tom", 18})
+
+	// 使用 kv 平铺更新
+	s.clause.Set(clause.WHERE, "Name = ?", "Tom")
+	affected, err := s.Update("Age", 30)
+	if err != nil {
+		t.Fatalf("failed to update with kv: %v", err)
+	}
+	if affected != 1 {
+		t.Errorf("expected 1 row affected, got %d", affected)
+	}
+}
+
+func TestSession_Update_WithStruct(t *testing.T) {
+	s, cleanup := testRecordInit(t)
+	defer cleanup()
+
+	_, _ = s.Insert(&User{"Tom", 18})
+
+	// 使用 struct 更新
+	s.clause.Set(clause.WHERE, "Name = ?", "Tom")
+	affected, err := s.Update(User{Name: "Tom", Age: 28})
+	if err != nil {
+		t.Fatalf("failed to update with struct: %v", err)
+	}
+	if affected != 1 {
+		t.Errorf("expected 1 row affected, got %d", affected)
+	}
+
+	// 验证数据已更新
+	var users []User
+	_ = s.Find(&users)
+	if len(users) != 1 || users[0].Age != 28 {
+		t.Errorf("expected age 28 after update, got %v", users)
+	}
+}
+
+func TestSession_Update_InvalidParam(t *testing.T) {
+	s, cleanup := testRecordInit(t)
+	defer cleanup()
+
+	// 无参数
+	_, err := s.Update()
+	if err == nil {
+		t.Error("expected error for empty Update args")
+	}
+
+	// 奇数个 kv 参数
+	_, err = s.Update("Name", "Tom", "Age")
+	if err == nil {
+		t.Error("expected error for odd kv args")
+	}
+
+	// kv 的 key 不是 string
+	_, err = s.Update(123, "Tom")
+	if err == nil {
+		t.Error("expected error for non-string kv key")
+	}
+
+	// 单参数传入非 struct/map
+	_, err = s.Update("just a string")
+	if err == nil {
+		t.Error("expected error for non-struct/map single arg")
 	}
 }
 
