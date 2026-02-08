@@ -1,6 +1,7 @@
 package schemas
 
 import (
+	"fmt"
 	"go/ast"
 	"reflect"
 
@@ -23,8 +24,11 @@ type Schema struct {
 	fieldMap   map[string]*Field
 }
 
-func Parse(dest any, d dialect.Dialect) *Schema {
+func Parse(dest any, d dialect.Dialect) (*Schema, error) {
 	modelType := reflect.Indirect(reflect.ValueOf(dest)).Type()
+	if modelType.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("geeorm: Parse requires a struct, got %s", modelType.Kind())
+	}
 	schema := &Schema{
 		Model:    dest,
 		Name:     modelType.Name(),
@@ -46,18 +50,21 @@ func Parse(dest any, d dialect.Dialect) *Schema {
 			schema.fieldMap[f.Name] = field
 		}
 	}
-	return schema
+	return schema, nil
 }
 
 func (s *Schema) GetField(name string) *Field {
 	return s.fieldMap[name]
 }
 
-func (s *Schema) RecordValues(val any) []any {
+func (s *Schema) RecordValues(val any) ([]any, error) {
 	destValue := reflect.Indirect(reflect.ValueOf(val))
+	if destValue.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("geeorm: RecordValues requires a struct, got %s", destValue.Kind())
+	}
 	fieldValue := make([]any, 0, len(s.Fields))
 	for _, fname := range s.FieldNames {
 		fieldValue = append(fieldValue, destValue.FieldByName(fname).Interface())
 	}
-	return fieldValue
+	return fieldValue, nil
 }

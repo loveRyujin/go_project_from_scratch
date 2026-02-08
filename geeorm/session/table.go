@@ -10,7 +10,11 @@ import (
 
 func (s *Session) Model(value any) *Session {
 	if s.refTable == nil || reflect.TypeOf(value) != reflect.TypeOf(s.refTable.Model) {
-		s.refTable = schemas.Parse(value, s.dialect)
+		var err error
+		s.refTable, err = schemas.Parse(value, s.dialect)
+		if err != nil {
+			panic(err)
+		}
 	}
 	return s
 }

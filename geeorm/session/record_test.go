@@ -101,3 +101,43 @@ func TestSession_Find_Empty(t *testing.T) {
 		t.Errorf("expected 0 users, got %d", len(users))
 	}
 }
+
+func TestSession_Find_InvalidParam(t *testing.T) {
+	s, cleanup := testRecordInit(t)
+	defer cleanup()
+
+	// 传入非指针应该返回错误
+	var users []User
+	err := s.Find(users)
+	if err == nil {
+		t.Error("expected error when passing non-pointer to Find")
+	}
+
+	// 传入非切片指针应该返回错误
+	var user User
+	err = s.Find(&user)
+	if err == nil {
+		t.Error("expected error when passing non-slice pointer to Find")
+	}
+
+	// 传入非结构体切片应该返回错误
+	var names []string
+	err = s.Find(&names)
+	if err == nil {
+		t.Error("expected error when passing non-struct slice to Find")
+	}
+}
+
+func TestSession_Insert_InvalidParam(t *testing.T) {
+	s, cleanup := newTestSession(t)
+	defer cleanup()
+
+	// 传入非结构体应该 panic
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when passing non-struct to Insert")
+		}
+	}()
+
+	s.Insert("not a struct")
+}
