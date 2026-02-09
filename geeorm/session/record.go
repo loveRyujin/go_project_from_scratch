@@ -18,6 +18,11 @@ func (s *Session) Insert(vals ...any) (int64, error) {
 	for _, val := range vals {
 		table := s.Model(val).RefTable()
 		s.clause.Set(clause.INSERT, table.Name, table.FieldNames)
+
+		if err := s.CallMethod(BeforeInsert, val); err != nil {
+			return 0, err
+		}
+
 		values, err := table.RecordValues(val)
 		if err != nil {
 			return 0, err
@@ -30,6 +35,12 @@ func (s *Session) Insert(vals ...any) (int64, error) {
 	result, err := s.Raw(sql, sqlVars...).Exec()
 	if err != nil {
 		return 0, err
+	}
+
+	for _, val := range vals {
+		if err := s.CallMethod(AfterInsert, val); err != nil {
+			return 0, err
+		}
 	}
 
 	return result.RowsAffected()
@@ -54,6 +65,10 @@ func (s *Session) Find(val any) error {
 
 	table := s.Model(reflect.New(itemType).Elem().Interface()).RefTable()
 
+	if err := s.CallMethod(BeforeQuery, table.Model); err != nil {
+		return err
+	}
+
 	s.clause.Set(clause.SELECT, table.Name, table.FieldNames)
 	sql, sqlVars := s.clause.Build(clause.SELECT, clause.WHERE, clause.ORDERBY, clause.LIMIT)
 	rows, err := s.Raw(sql, sqlVars...).QueryRows()
@@ -68,6 +83,9 @@ func (s *Session) Find(val any) error {
 			values = append(values, dest.FieldByName(fname).Addr().Interface())
 		}
 		if err := rows.Scan(values...); err != nil {
+			return err
+		}
+		if err := s.CallMethod(AfterQuery, dest.Addr().Interface()); err != nil {
 			return err
 		}
 		destSlice.Set(reflect.Append(destSlice, dest))
@@ -87,6 +105,10 @@ func (s *Session) Find(val any) error {
 //	s.clause.Set(clause.WHERE, "Name = ?", "Tom")
 //	s.Update("Age", 25)
 func (s *Session) Update(vals ...any) (int64, error) {
+	if err := s.CallMethod(BeforeUpdate, s.RefTable().Model); err != nil {
+		return 0, err
+	}
+
 	m, err := toUpdateMap(s.RefTable().FieldNames, vals...)
 	if err != nil {
 		return 0, err
@@ -96,6 +118,10 @@ func (s *Session) Update(vals ...any) (int64, error) {
 	sql, sqlVars := s.clause.Build(clause.UPDATE, clause.WHERE)
 	result, err := s.Raw(sql, sqlVars...).Exec()
 	if err != nil {
+		return 0, err
+	}
+
+	if err := s.CallMethod(AfterUpdate, s.RefTable().Model); err != nil {
 		return 0, err
 	}
 
@@ -147,12 +173,21 @@ func toUpdateMap(fieldNames []string, vals ...any) (map[string]any, error) {
 //	s.clause.Set(clause.WHERE, "Name = ?", "Tom")
 //	s.Delete()
 func (s *Session) Delete() (int64, error) {
+	if err := s.CallMethod(BeforeDelete, s.RefTable().Model); err != nil {
+		return 0, err
+	}
+
 	s.clause.Set(clause.DELETE, s.RefTable().Name)
 	sql, sqlVars := s.clause.Build(clause.DELETE, clause.WHERE)
 	result, err := s.Raw(sql, sqlVars...).Exec()
 	if err != nil {
 		return 0, err
 	}
+
+	if err := s.CallMethod(AfterDelete, s.RefTable().Model); err != nil {
+		return 0, err
+	}
+
 	return result.RowsAffected()
 }
 
