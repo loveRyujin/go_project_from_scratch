@@ -79,8 +79,8 @@ func (e *Engine) Transcation(fn TxFn) (result any, err error) {
 			panic(r)
 		} else if err != nil {
 			_ = s.Rollback()
-		} else {
-			err = s.Commit()
+		} else if err = s.Commit(); err != nil {
+			_ = s.Rollback()
 		}
 	}()
 
