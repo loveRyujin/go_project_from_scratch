@@ -8,6 +8,9 @@ import (
 	"github.com/loveRyujin/geeorm/session"
 )
 
+// TxFn 是事务回调函数类型。在 Transcation 中执行，返回 error 时自动回滚。
+type TxFn func(*session.Session) (any, error)
+
 // Engine 是 geeorm 的核心入口，管理数据库连接和 dialect。
 type Engine struct {
 	db      *sql.DB
@@ -55,4 +58,31 @@ func (e *Engine) Close() {
 //	s.Model(&User{}).CreateTable()
 func (e *Engine) Session() *session.Session {
 	return session.New(e.db, e.dialect)
+}
+
+// Transcation 在事务中执行 fn。fn 返回 error 或 panic 时自动回滚，否则自动提交。
+//
+//	result, err := engine.Transcation(func(s *session.Session) (any, error) {
+//	    s.Model(&User{})
+//	    _, err := s.Insert(&User{"Tom", 18})
+//	    return nil, err
+//	})
+func (e *Engine) Transcation(fn TxFn) (result any, err error) {
+	s := e.Session()
+	if bErr := s.Begin(); bErr != nil {
+		slog.Error(err.Error())
+		return nil, bErr
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			_ = s.Rollback()
+			panic(r)
+		} else if err != nil {
+			_ = s.Rollback()
+		} else {
+			err = s.Commit()
+		}
+	}()
+
+	return fn(s)
 }
