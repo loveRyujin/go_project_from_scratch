@@ -94,7 +94,7 @@ func TestGobCodec_MultipleRounds(t *testing.T) {
 	// writer 端连续写入多轮
 	go func() {
 		defer wg.Done()
-		for i := 0; i < rounds; i++ {
+		for i := range rounds {
 			h := &Header{
 				ServerMethod: "Arith.Multiply",
 				Seq:          uint64(i),
@@ -108,7 +108,7 @@ func TestGobCodec_MultipleRounds(t *testing.T) {
 	}()
 
 	// reader 端连续读取多轮
-	for i := 0; i < rounds; i++ {
+	for i := range rounds {
 		var readH Header
 		if err := reader.ReadHeader(&readH); err != nil {
 			t.Fatalf("round %d: ReadHeader error: %v", i, err)
